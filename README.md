@@ -1,4 +1,4 @@
-# Kali Linux Tools MCP Server
+# MCP Server for Breaking Shyet
 
 A Model Context Protocol (MCP) server that connects Claude for Desktop with Kali Linux security tools, enabling AI-assisted penetration testing for HackTheBox machines.
 
