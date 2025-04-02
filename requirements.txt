@@ -1,0 +1,5 @@
+Flask==2.3.3
+requests==2.31.0
+Werkzeug==2.3.7
+psutil==5.9.5
+ollama==0.1.5 
