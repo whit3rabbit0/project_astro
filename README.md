@@ -1,6 +1,6 @@
-# MCP Server for Breaking Shyet
+# MCP Server for Breaking Shyet - Diclaimer - This is a DEVKIT
 
-A Model Context Protocol (MCP) server that connects Claude for Desktop with Kali Linux security tools, enabling AI-assisted penetration testing for HackTheBox machines.
+A Model Context Protocol (MCP) server that connects Claude for Desktop with Kali Linux security tools, enabling AI-assisted penetration testing 
 
 ## Architecture
 
@@ -16,11 +16,10 @@ Claude for Desktop ←→ MCP Server ←→ Kali Linux API Server ←→ Kali Li
 
 ## Features
 
-- Integration with 10+ popular Kali Linux security tools
+- Integration with popular Kali Linux security tools
 - Support for HackTheBox machines ranging from Easy to Insane difficulty
 - Pre-defined pentesting prompts for common tasks
 - Contextual information about HackTheBox environments
-- Secure execution of commands in a controlled environment
 - Comprehensive debugging tools for troubleshooting
 
 ## Prerequisites
