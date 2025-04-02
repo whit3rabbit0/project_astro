@@ -17,7 +17,6 @@ Claude for Desktop ←→ MCP Server ←→ Kali Linux API Server ←→ Kali Li
 ## Features
 
 - Integration with popular Kali Linux security tools
-- Support for HackTheBox machines ranging from Easy to Insane difficulty
 - Pre-defined pentesting prompts for common tasks
 - Contextual information about HackTheBox environments
 - Comprehensive debugging tools for troubleshooting
