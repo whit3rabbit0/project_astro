@@ -1,0 +1,14 @@
+engagement:
+  name: "HTB-Machine"
+  id: "eng-001"
+
+scope:
+  allowed_cidrs:
+    - "10.10.10.0/24"
+  allowed_domains:
+    - "*.htb"
+  excluded_targets:
+    - "10.10.10.1"
+  tool_restrictions:
+    hydra:
+      max_threads: 4

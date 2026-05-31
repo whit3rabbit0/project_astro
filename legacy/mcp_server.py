@@ -43,6 +43,20 @@ DEBUG_MODE = os.environ.get("DEBUG_MODE", "0").lower() in ("1", "true", "yes", "
 
 app = Flask(__name__)
 
+API_KEY = os.environ.get("API_KEY")
+
+if not API_KEY:
+    logger.warning("API_KEY is not set — server is running without authentication")
+
+@app.before_request
+def require_api_key():
+    if not API_KEY:
+        return
+    if request.path.startswith("/mcp/"):
+        provided = request.headers.get("X-API-Key")
+        if provided != API_KEY:
+            return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
 # Available Kali Linux tools mapped to their API endpoints
 KALI_TOOLS = {
     "nmap": "/api/tools/nmap",
@@ -101,10 +115,14 @@ def execute_tool(tool_name):
         logger.info(f"Executing {tool_name} with params: {params}")
         
         try:
+            backend_headers = {}
+            if API_KEY:
+                backend_headers["X-API-Key"] = API_KEY
+
             # Check if API server is responsive
             health_check_url = f"{KALI_API_BASE_URL}/health"
             try:
-                health_response = requests.get(health_check_url, timeout=5)
+                health_response = requests.get(health_check_url, timeout=5, headers=backend_headers)
                 if health_response.status_code != 200:
                     logger.error(f"API server health check failed: {health_response.status_code}")
                     return jsonify({
@@ -118,12 +136,13 @@ def execute_tool(tool_name):
                     "status": "error",
                     "message": f"API server is not responding: {str(e)}"
                 }), 503
-            
+
             # Forward the request to the Kali Linux API server
             logger.debug(f"Sending request to {KALI_API_BASE_URL}{KALI_TOOLS[tool_name]}")
             response = requests.post(
                 f"{KALI_API_BASE_URL}{KALI_TOOLS[tool_name]}",
                 json=params,
+                headers=backend_headers,
                 timeout=300  # Some tools might take time to execute
             )
             
@@ -328,4 +347,4 @@ if __name__ == "__main__":
     
     logger.info(f"Starting MCP Server on port {MCP_PORT}")
     logger.info(f"Connecting to Kali Linux API at {KALI_API_BASE_URL}")
-    app.run(host="0.0.0.0", port=MCP_PORT, debug=DEBUG_MODE) 
+    app.run(host="127.0.0.1", port=MCP_PORT, debug=False) 

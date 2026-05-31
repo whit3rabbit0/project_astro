@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+.vscode
+.claude-flow
+legacy/
+node_modules/
+*.egg-info/
+.mypy_cache
+.ruff_cache
+data/

@@ -1,4 +1,5 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -7,3 +8,10 @@ __pycache__/
 env/
 debug.log
 .DS_Store
+*.egg-info/
+dist/
+build/
+.eggs/
+*.db
+.claude-flow/
+obsidian-vault/

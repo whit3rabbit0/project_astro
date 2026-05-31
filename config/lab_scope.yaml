@@ -1,0 +1,34 @@
+engagement:
+  name: "Metasploitable2-Lab"
+  id: "lab-metasploitable2"
+  description: "Local lab testing against Metasploitable2 Docker container"
+
+scope:
+  allowed_cidrs:
+    - "172.28.0.0/24"
+  allowed_domains:
+    - "target"
+    - "metasploitable"
+  excluded_targets: []
+
+  tool_restrictions:
+    nmap:
+      enabled: true
+      max_concurrent_scans: 2
+    hydra:
+      enabled: true
+      max_threads: 4
+      service_whitelist:
+        - "ssh"
+        - "ftp"
+        - "http"
+        - "telnet"
+        - "postgres"
+        - "mysql"
+    sqlmap:
+      enabled: true
+      risk_level: 2
+
+reporting:
+  format: "sarif"
+  include_remediation: true

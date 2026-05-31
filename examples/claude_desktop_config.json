@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "project-astro": {
+      "url": "http://localhost:8080/mcp",
+      "env": {
+        "API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}

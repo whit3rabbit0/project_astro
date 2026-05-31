@@ -1,0 +1,49 @@
+services:
+  target:
+    image: tleemcjr/metasploitable2
+    container_name: metasploitable2
+    tty: true
+    stdin_open: true
+    networks:
+      astro-lab:
+        ipv4_address: 172.28.0.2
+    restart: unless-stopped
+
+  astro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: astro-server
+    ports:
+      - "8888:8080"
+    environment:
+      - ASTRO_HOST=0.0.0.0
+      - ASTRO_PORT=8080
+      - ASTRO_TRANSPORT=streamable-http
+      - ASTRO_DB_PATH=/home/astro/.astro/engagements.db
+      - ASTRO_SCOPE_CONFIG=/app/config/lab_scope.yaml
+      - ASTRO_DEBUG=true
+    volumes:
+      - astro-data:/home/astro/.astro
+      - ./config:/app/config:ro
+    networks:
+      astro-lab:
+        ipv4_address: 172.28.0.3
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    user: root
+    depends_on:
+      - target
+    restart: unless-stopped
+
+networks:
+  astro-lab:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
+volumes:
+  astro-data:

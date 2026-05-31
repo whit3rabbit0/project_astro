@@ -79,6 +79,12 @@ def configure_debug_mode(app, is_mcp_server=True):
         g.start_time = time.time()
         g.request_id = f"{int(time.time())}-{id(request)}"
         
+        _sensitive_headers = {"Authorization", "Cookie", "X-API-Key", "X-Auth-Token"}
+        redacted_headers = {
+            k: "[REDACTED]" if k in _sensitive_headers else v
+            for k, v in request.headers
+        }
+
         # Track request
         request_data = {
             "id": g.request_id,
@@ -86,7 +92,7 @@ def configure_debug_mode(app, is_mcp_server=True):
             "method": request.method,
             "path": request.path,
             "remote_addr": request.remote_addr,
-            "headers": dict(request.headers),
+            "headers": redacted_headers,
         }
         
         # Add request body if it's JSON
