@@ -48,7 +48,25 @@ def _now() -> str:
 
 class EngagementManager:
     def __init__(self, db_path: str = DEFAULT_DB_PATH) -> None:
-        self._db_path = str(Path(db_path).expanduser())
+        resolved = Path(db_path).expanduser().resolve()
+
+        # Security: ensure db_path parent is within user's home, /tmp, or cwd
+        home_dir = Path.home().resolve()
+        tmp_dir = Path("/tmp").resolve()
+        cwd = Path.cwd().resolve()
+        parent_dir = resolved.parent
+        if not (
+            str(parent_dir).startswith(str(home_dir))
+            or str(parent_dir).startswith(str(tmp_dir))
+            or str(parent_dir).startswith(str(cwd))
+        ):
+            raise ValueError(
+                f"db_path must be within the user's home directory, /tmp, or "
+                f"the current working directory, got: {resolved}"
+            )
+
+        parent_dir.mkdir(parents=True, exist_ok=True)
+        self._db_path = str(resolved)
         self._db: Optional[aiosqlite.Connection] = None
 
     async def initialize(self) -> None:

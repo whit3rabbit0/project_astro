@@ -1,10 +1,14 @@
 """Metasploit Framework tool — uses resource scripts via msfconsole."""
 import os
+import re
 import tempfile
 from typing import Any
 
 from astro.core.validators import validate_no_control_chars
 from astro.tools.base import BaseTool, ToolResult
+
+_MODULE_PATH_RE = re.compile(r"^[a-z0-9/_]+$")
+_OPTION_KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 class MetasploitTool(BaseTool):
@@ -15,15 +19,27 @@ class MetasploitTool(BaseTool):
         module = params.get("module", "")
         if not module:
             raise ValueError("Module parameter is required")
-        if not all(c.isalnum() or c in "/._-" for c in module):
-            raise ValueError("Invalid module parameter")
+        if not _MODULE_PATH_RE.match(module):
+            raise ValueError(
+                "Invalid module path: only lowercase alphanumeric, '/' and '_' allowed"
+            )
 
         options: dict[str, Any] = params.get("options", {})
         for key, value in options.items():
             key_str = str(key)
             value_str = str(value)
-            if not validate_no_control_chars(key_str):
-                raise ValueError(f"Invalid option key: {key_str!r}")
+
+            if not _OPTION_KEY_RE.match(key_str):
+                raise ValueError(
+                    f"Invalid option key: {key_str!r} — must match ^[A-Z][A-Z0-9_]*$"
+                )
+
+            if "\n" in value_str or "\r" in value_str or "#" in value_str:
+                raise ValueError(
+                    f"Invalid value for option {key_str!r}: "
+                    "must not contain newline, carriage return, or '#'"
+                )
+
             if not validate_no_control_chars(value_str):
                 raise ValueError(f"Invalid value for option {key_str!r}")
 
@@ -39,7 +55,7 @@ class MetasploitTool(BaseTool):
 
         resource_content = f"use {validated['module']}\n"
         for key, value in validated["options"].items():
-            resource_content += f"set {key} {value}\n"
+            resource_content += f"set {key} \"{value}\"\n"
         resource_content += "exploit\n"
 
         fd, resource_file = tempfile.mkstemp(suffix=".rc", prefix="astro_msf_")

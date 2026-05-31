@@ -20,6 +20,9 @@ from astro.tools import ToolCategory, create_default_registry
 
 logger = structlog.get_logger(__name__)
 
+# NOTE: FastMCP does not natively support CORS configuration. In production,
+# a reverse proxy (e.g. nginx, Caddy) MUST enforce CORS with allowed origins
+# restricted to localhost / trusted domains only.
 mcp = FastMCP(
     "Project Astro",
     host=os.environ.get("ASTRO_HOST", "127.0.0.1"),
@@ -47,6 +50,24 @@ async def _run_tool(tool_key: str, params: dict[str, Any]) -> dict[str, Any]:
         target = params.get("target") or params.get("url") or ""
         if target:
             _scope.validate_target(target)
+
+        # Check host parameter (netcat, chisel, etc.)
+        host_param = params.get("host") or ""
+        if host_param:
+            _scope.validate_target(host_param)
+
+        # Check target_url parameter (burp, etc.)
+        target_url_param = params.get("target_url") or ""
+        if target_url_param:
+            _scope.validate_target(target_url_param)
+
+        # Check Metasploit options for target parameters
+        options = params.get("options")
+        if isinstance(options, dict):
+            for opt_key in ("RHOSTS", "RHOST", "LHOST"):
+                opt_val = options.get(opt_key) or ""
+                if opt_val:
+                    _scope.validate_target(opt_val)
 
     tool = _registry.get(tool_key)
 
@@ -657,7 +678,25 @@ async def create_engagement(name: str, scope_config_path: str = "") -> dict[str,
     if scope_config_path:
         from pathlib import Path
         import yaml
-        path = Path(scope_config_path)
+        path = Path(scope_config_path).resolve()
+
+        # Security: validate scope config path
+        if path.suffix.lower() not in (".yaml", ".yml"):
+            return {"status": "error", "message": "scope_config_path must be a .yaml or .yml file"}
+
+        home_dir = Path.home().resolve()
+        tmp_dir = Path("/tmp").resolve()
+        cwd = Path.cwd().resolve()
+        if not (
+            str(path).startswith(str(home_dir))
+            or str(path).startswith(str(tmp_dir))
+            or str(path).startswith(str(cwd))
+        ):
+            return {
+                "status": "error",
+                "message": "scope_config_path must be within the user's home directory, /tmp, or the current working directory",
+            }
+
         if path.exists():
             scope_config = yaml.safe_load(path.read_text())
     engagement_id = await _engagement.create_engagement(

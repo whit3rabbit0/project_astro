@@ -43,6 +43,17 @@ class ScopeEnforcer:
 
         host = self._extract_host(target)
 
+        # Normalize IP representations — convert IPv6-mapped IPv4 to plain IPv4
+        try:
+            addr = ipaddress.ip_address(host)
+            if hasattr(addr, "ipv4_mapped") and addr.ipv4_mapped is not None:
+                addr = addr.ipv4_mapped
+            host = str(addr)
+            is_ip = True
+        except ValueError:
+            # Not a valid IP — treat as hostname
+            is_ip = False
+
         excluded = scope.get("excluded_targets", [])
         if target in excluded or host in excluded:
             raise ScopeViolationError(f"Target {target!r} is explicitly excluded")
@@ -50,22 +61,23 @@ class ScopeEnforcer:
         allowed_cidrs: list[str] = scope.get("allowed_cidrs", [])
         allowed_domains: list[str] = scope.get("allowed_domains", [])
 
-        if not allowed_cidrs and not allowed_domains:
+        # If either allowlist is configured (even if empty), default to DENY
+        if "allowed_cidrs" not in scope and "allowed_domains" not in scope:
             return
 
-        for cidr in allowed_cidrs:
-            try:
-                network = ipaddress.ip_network(cidr, strict=False)
-                addr = ipaddress.ip_address(host)
-                if addr in network:
+        if is_ip:
+            for cidr in allowed_cidrs:
+                try:
+                    network = ipaddress.ip_network(cidr, strict=False)
+                    if addr in network:
+                        return
+                except ValueError:
+                    continue
+        else:
+            host_lower = host.lower()
+            for pattern in allowed_domains:
+                if fnmatch.fnmatch(host_lower, pattern.lower()):
                     return
-            except ValueError:
-                continue
-
-        host_lower = host.lower()
-        for pattern in allowed_domains:
-            if fnmatch.fnmatch(host_lower, pattern.lower()):
-                return
 
         raise ScopeViolationError(f"Target {target!r} is not in scope")
 

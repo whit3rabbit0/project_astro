@@ -1,5 +1,7 @@
 """Burp Suite Pro REST API integration tool."""
+import ipaddress
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -23,6 +25,9 @@ class BurpTool(BaseTool):
         scan_id = params.get("scan_id", "")
         burp_api_url = params.get("burp_api_url", "http://127.0.0.1:1337").rstrip("/")
 
+        # SSRF protection: burp_api_url must point to loopback or private network
+        self._validate_burp_api_url(burp_api_url)
+
         if action == "scan":
             if not target_url:
                 raise ValueError("target_url is required for scan action")
@@ -41,6 +46,55 @@ class BurpTool(BaseTool):
             "scan_id": scan_id,
             "burp_api_url": burp_api_url,
         }
+
+    @staticmethod
+    def _validate_burp_api_url(url: str) -> None:
+        """Validate that burp_api_url points to a loopback or private network address."""
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            raise ValueError("burp_api_url must have a valid hostname")
+
+        # Allow literal 'localhost'
+        if hostname == "localhost":
+            return
+
+        # Block cloud metadata endpoints
+        _blocked_addresses = {
+            "169.254.169.254",
+            "metadata.google.internal",
+        }
+        if hostname in _blocked_addresses:
+            raise ValueError(
+                "burp_api_url must not point to cloud metadata services"
+            )
+
+        try:
+            addr = ipaddress.ip_address(hostname)
+        except ValueError:
+            # Not an IP literal — reject non-localhost hostnames to prevent DNS rebinding
+            raise ValueError(
+                "burp_api_url must be an IP address (loopback or private) or 'localhost'"
+            )
+
+        # Block link-local (169.254.x.x) which includes metadata endpoint
+        if addr.is_link_local:
+            raise ValueError(
+                "burp_api_url must not point to link-local addresses"
+            )
+
+        # Allow loopback (127.x.x.x, ::1)
+        if addr.is_loopback:
+            return
+
+        # Allow private networks (10.x, 172.16-31.x, 192.168.x, fd00::/8)
+        if addr.is_private:
+            return
+
+        raise ValueError(
+            "burp_api_url must be a loopback (127.0.0.1, localhost) or "
+            "private network address (10.x, 172.16-31.x, 192.168.x)"
+        )
 
     def build_command(self, params: dict[str, Any]) -> list[str]:
         # BurpTool uses httpx, not subprocess — this method is not used.

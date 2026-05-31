@@ -15,9 +15,24 @@ from typing import Any
 
 class ObsidianExporter:
     def __init__(self, vault_path: str, engagement_name: str) -> None:
-        self._vault = Path(vault_path).expanduser()
+        self._vault = Path(vault_path).expanduser().resolve()
+
+        # Security: ensure vault path is within the user's home directory or /tmp
+        home_dir = Path.home().resolve()
+        tmp_dir = Path("/tmp").resolve()
+        if not (
+            str(self._vault).startswith(str(home_dir))
+            or str(self._vault).startswith(str(tmp_dir))
+        ):
+            raise ValueError(
+                f"vault_path must be within the user's home directory or /tmp, "
+                f"got: {self._vault}"
+            )
+
         self._engagement = engagement_name
-        self._slug = re.sub(r"[^a-zA-Z0-9-]", "-", engagement_name).strip("-")
+        slug = re.sub(r"[^a-zA-Z0-9-]", "-", engagement_name).strip("-")
+        slug = slug.replace("..", "")
+        self._slug = slug
         self._base = self._vault / self._slug
         self._created_files: list[str] = []
 
@@ -261,6 +276,7 @@ class ObsidianExporter:
     def _write_host_notes(self, hosts: dict[str, dict], findings: list[dict]) -> None:
         for host, info in hosts.items():
             slug = re.sub(r"[^a-zA-Z0-9.-]", "-", host)
+            slug = slug.replace("..", "")
 
             lines = [
                 "---",

@@ -271,14 +271,11 @@ class OIDCAuthenticator:
             import jwt as pyjwt  # type: ignore[import-untyped]
             from jwt import PyJWKClient  # type: ignore[import-untyped]
         except ImportError:
-            logger.warning(
-                "oidc_no_crypto_verification",
-                msg=(
-                    "PyJWT is not installed -- JWT signature verification "
-                    "is SKIPPED.  Install 'PyJWT[crypto]' for full security."
-                ),
+            raise AuthenticationError(
+                "PyJWT is not installed -- JWT signature verification "
+                "cannot be performed.  Install 'PyJWT[crypto]' to enable "
+                "OIDC authentication."
             )
-            return
 
         kid = header.get("kid")
         alg = header.get("alg", "RS256")

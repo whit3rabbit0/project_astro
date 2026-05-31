@@ -10,7 +10,10 @@ Supports three modes (selected automatically based on configuration):
 
 from __future__ import annotations
 
+import hmac
 import os
+import time as _time
+from collections import deque
 from typing import Optional
 
 import structlog
@@ -71,7 +74,9 @@ def verify_api_key(provided: Optional[str]) -> bool:
     configured = get_api_key()
     if not configured:
         return True
-    return provided == configured
+    if not provided:
+        return False
+    return hmac.compare_digest(provided, configured)
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +103,10 @@ class AuthManager:
             raise PermissionError("Not authenticated")
     """
 
+    # Rate limiting constants
+    _RATE_LIMIT_MAX_FAILURES = 10
+    _RATE_LIMIT_WINDOW_SECONDS = 60
+
     def __init__(self, config: object) -> None:
         # Accept AstroConfig (or any object with the required attributes) to
         # avoid a circular import with astro.server.config.
@@ -117,6 +126,9 @@ class AuthManager:
 
         self._oidc: OIDCAuthenticator | None = None
         self._initialized = False
+
+        # Rate limiting: track timestamps of failed auth attempts
+        self._failed_attempts: deque[float] = deque()
 
     @property
     def auth_mode(self) -> str:
@@ -148,6 +160,21 @@ class AuthManager:
 
     # -- authentication ------------------------------------------------------
 
+    def _record_failure(self) -> None:
+        """Record a failed authentication attempt for rate limiting."""
+        self._failed_attempts.append(_time.time())
+
+    def _is_rate_limited(self) -> bool:
+        """Check if authentication attempts are currently rate limited."""
+        now = _time.time()
+        cutoff = now - self._RATE_LIMIT_WINDOW_SECONDS
+
+        # Evict expired entries from the front of the deque
+        while self._failed_attempts and self._failed_attempts[0] < cutoff:
+            self._failed_attempts.popleft()
+
+        return len(self._failed_attempts) >= self._RATE_LIMIT_MAX_FAILURES
+
     async def authenticate(
         self,
         api_key: str | None = None,
@@ -165,28 +192,39 @@ class AuthManager:
            mode).
         4. Otherwise, reject.
         """
+        # -- Rate limiting ----------------------------------------------------
+        if self._is_rate_limited():
+            logger.warning("auth_rate_limited")
+            raise AuthenticationError(
+                "Too many failed authentication attempts. Please try again later."
+            )
+
         # -- OIDC path -------------------------------------------------------
         if bearer_token and self._oidc:
             try:
                 user = await self._oidc.authenticate(bearer_token)
                 return AuthResult(authenticated=True, method="oidc", user=user)
             except AuthenticationError:
+                self._record_failure()
                 logger.warning("auth_oidc_failed", reason="token validation failed")
                 return AuthResult(authenticated=False, method="oidc")
 
         # -- API key path -----------------------------------------------------
         if self._api_key:
-            if api_key and api_key == self._api_key:
+            if api_key and hmac.compare_digest(api_key, self._api_key):
                 return AuthResult(authenticated=True, method="api_key")
+            # If we reach here, either no api_key was provided or it was wrong.
+            # Either way, authentication fails when an API key is configured.
             if api_key:
+                self._record_failure()
                 logger.warning("auth_api_key_failed")
-            return AuthResult(
-                authenticated=not bool(api_key or bearer_token),
-                method="api_key",
-            )
+            else:
+                self._record_failure()
+            return AuthResult(authenticated=False, method="api_key")
 
         # -- OIDC required but no token provided ------------------------------
         if self._oidc and not bearer_token:
+            self._record_failure()
             return AuthResult(authenticated=False, method="oidc")
 
         # -- No auth configured -----------------------------------------------

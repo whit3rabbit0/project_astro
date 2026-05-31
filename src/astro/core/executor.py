@@ -1,4 +1,5 @@
 import asyncio
+import re
 import subprocess
 import traceback
 from typing import Dict, Any, List
@@ -7,6 +8,26 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+_PASSWORD_FLAGS = frozenset({"-p", "-P", "--password"})
+_USERPASS_RE = re.compile(r"(://[^:/@]+:)([^@]+)(@)")
+
+
+def _redact_command(command: List[str]) -> List[str]:
+    """Return a copy of the command list with password arguments masked."""
+    redacted = []
+    redact_next = False
+    for arg in command:
+        if redact_next:
+            redacted.append("***")
+            redact_next = False
+        elif arg in _PASSWORD_FLAGS:
+            redacted.append(arg)
+            redact_next = True
+        else:
+            # Redact user:pass@host patterns within arguments
+            redacted.append(_USERPASS_RE.sub(r"\1***\3", arg))
+    return redacted
+
 
 class ToolExecutor:
     async def execute(self, command: List[str], timeout: int = 300) -> Dict[str, Any]:
@@ -14,7 +35,7 @@ class ToolExecutor:
         return await asyncio.to_thread(self._run, command, timeout)
 
     def _run(self, command: List[str], timeout: int) -> Dict[str, Any]:
-        logger.info("executing_command", command=command)
+        logger.info("executing_command", command=_redact_command(command))
         try:
             process = subprocess.Popen(
                 command,

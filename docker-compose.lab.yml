@@ -32,7 +32,11 @@ services:
     cap_add:
       - NET_RAW
       - NET_ADMIN
-    user: root
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+      - /home/astro/.astro
     depends_on:
       - target
     restart: unless-stopped
