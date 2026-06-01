@@ -1,4 +1,4 @@
-# Project Astro V2
+# Project Astro V2 - Disclaimer - This is DEVKIT
 
 Intelligence layer for LLM-driven penetration testing. Ships as an MCP server with 38 Kali tool wrappers, engagement tracking, scope enforcement, and structured output for any MCP-compatible client.
 
