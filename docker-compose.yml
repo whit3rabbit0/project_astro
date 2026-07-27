@@ -7,7 +7,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     environment:
-      - API_KEY=${API_KEY:?Set API_KEY before starting Project Astro}
+      - API_KEY=${API_KEY:?API_KEY_required}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - ASTRO_DEBUG=${ASTRO_DEBUG:-false}
       - ASTRO_HOST=0.0.0.0
