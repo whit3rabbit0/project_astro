@@ -93,3 +93,50 @@ jobs:
 
       - name: Build image
         run: docker build --quiet --tag project-astro:ci .
+
+      - name: Validate registered runtime binaries
+        run: |
+          docker run --rm --entrypoint sh project-astro:ci -ec '
+            for binary in \
+              nmap gobuster dirb nikto sqlmap msfconsole hydra john wpscan \
+              enum4linux subfinder amass ffuf whatweb dnsrecon theHarvester \
+              searchsploit hashcat responder smbclient evil-winrm bash python3
+            do
+              command -v "$binary" >/dev/null || {
+                echo "missing runtime binary: $binary" >&2
+                exit 1
+              }
+            done
+            command -v crackmapexec >/dev/null || command -v nxc >/dev/null || {
+              echo "missing runtime binary: crackmapexec or nxc" >&2
+              exit 1
+            }
+          '
+
+      - name: Verify authenticated container health
+        run: |
+          docker run --detach --name astro-ci \
+            --publish 127.0.0.1:18080:8080 \
+            --env API_KEY=ci-placeholder-key \
+            project-astro:ci \
+            astro serve --transport streamable-http --port 8080 --host 0.0.0.0
+          trap 'docker logs astro-ci || true; docker rm --force astro-ci >/dev/null 2>&1 || true' EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/health >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "Astro container did not become healthy" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          status=$(curl --silent --output /tmp/unauthorized.json --write-out '%{http_code}' \
+            --request POST \
+            --header 'Accept: application/json, text/event-stream' \
+            --header 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            http://127.0.0.1:18080/mcp)
+          test "$status" = "401"
