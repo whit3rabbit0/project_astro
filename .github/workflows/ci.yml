@@ -54,10 +54,7 @@ jobs:
           --output-format=concise
 
       - name: Contribution mypy gate
-        run: >-
-          mypy --follow-imports=skip
-          src/astro/__main__.py
-          src/astro/server/http_security.py
+        run: mypy --follow-imports=skip src/astro/server/http_security.py
 
       - name: Repository mypy baseline
         run: |
