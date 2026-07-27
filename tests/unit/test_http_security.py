@@ -4,7 +4,9 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any
 
+import httpx
 import pytest
+from mcp.server.fastmcp import FastMCP
 
 from astro.core.auth import AuthenticationError
 from astro.server.http_security import (
@@ -171,3 +173,64 @@ def test_no_auth_mode_passes_through() -> None:
     app = AuthenticatedMCPApp(_downstream, auth)
     messages = asyncio.run(_request(app))
     assert messages[0]["status"] == 204
+
+
+@pytest.mark.asyncio
+async def test_valid_api_key_allows_real_fastmcp_tool_call() -> None:
+    server = FastMCP("auth-integration", json_response=True)
+
+    @server.tool()
+    def ping() -> str:
+        return "pong"
+
+    app = AuthenticatedMCPApp(server.streamable_http_app(), _FakeAuth())
+    transport = httpx.ASGITransport(app=app)
+    base_headers = {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+        "X-API-Key": "secret",
+    }
+    initialize = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {"name": "astro-auth-test", "version": "1"},
+        },
+    }
+
+    async with server.session_manager.run():
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
+            initialized = await client.post("/mcp", json=initialize, headers=base_headers)
+            assert initialized.status_code == 200
+
+            session_id = initialized.headers["mcp-session-id"]
+            protocol_version = initialized.json()["result"]["protocolVersion"]
+            session_headers = {
+                **base_headers,
+                "Mcp-Session-Id": session_id,
+                "Mcp-Protocol-Version": protocol_version,
+            }
+
+            notification = await client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+                headers=session_headers,
+            )
+            assert notification.status_code == 202
+
+            called = await client.post(
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": "ping", "arguments": {}},
+                },
+                headers=session_headers,
+            )
+
+    assert called.status_code == 200
+    assert "pong" in called.text
