@@ -49,15 +49,15 @@ jobs:
           tests/unit/test_http_security.py
           --output-format=concise
 
+      - name: Contribution mypy gate
+        run: mypy src/astro/__main__.py src/astro/server/http_security.py
+
       - name: Repository mypy baseline
         run: |
           if ! mypy src > /tmp/repository-mypy.log; then
             count=$(grep -c ': error:' /tmp/repository-mypy.log || true)
             echo "::warning::Repository mypy baseline has ${count} errors outside this focused contribution."
           fi
-
-      - name: Contribution mypy gate
-        run: mypy src/astro/__main__.py src/astro/server/http_security.py
 
       - name: Pytest
         run: pytest
