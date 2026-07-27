@@ -47,6 +47,9 @@ jobs:
           src/astro/__main__.py
           src/astro/server/http_security.py
           tests/unit/test_http_security.py
+          tests/unit/test_nmap_tool.py
+          tests/unit/test_scope.py
+          tests/unit/test_validators.py
           --output-format=concise
 
       - name: Contribution mypy gate
