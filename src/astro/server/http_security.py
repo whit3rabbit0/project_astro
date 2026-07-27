@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import ipaddress
 import json
-from typing import Any, Awaitable, Callable, Protocol
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol
+
+from astro.core.auth import AuthenticationError
 
 ASGIReceive = Callable[[], Awaitable[dict[str, Any]]]
 ASGISend = Callable[[dict[str, Any]], Awaitable[None]]
@@ -138,9 +141,7 @@ class AuthenticatedMCPApp:
                 api_key=headers.get("x-api-key"),
                 bearer_token=_bearer_token(headers.get("authorization")),
             )
-        except Exception:
-            # Authentication backends must fail closed. Detailed errors stay in
-            # server logs rather than leaking provider details to the client.
+        except AuthenticationError:
             await _send_json(send, 401, {"error": "unauthorized"})
             return
 
