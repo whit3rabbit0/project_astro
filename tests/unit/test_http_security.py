@@ -188,6 +188,7 @@ async def test_valid_api_key_allows_real_fastmcp_tool_call() -> None:
     base_headers = {
         "Accept": "application/json, text/event-stream",
         "Content-Type": "application/json",
+        "Host": "127.0.0.1:8000",
         "X-API-Key": "secret",
     }
     initialize = {
@@ -207,7 +208,7 @@ async def test_valid_api_key_allows_real_fastmcp_tool_call() -> None:
     session_id: str | None = None
 
     async with server.session_manager.run():
-        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8000") as client:
             initialized = await client.post("/mcp", json=initialize, headers=base_headers)
             session_id = initialized.headers.get("mcp-session-id")
             if initialized.status_code == 200 and session_id:
