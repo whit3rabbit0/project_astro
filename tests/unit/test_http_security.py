@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from astro.core.auth import AuthenticationError
 from astro.server.http_security import (
     AuthenticatedMCPApp,
     is_loopback_host,
@@ -39,7 +40,7 @@ class _RaisingAuth(_FakeAuth):
         api_key: str | None = None,
         bearer_token: str | None = None,
     ) -> _Result:
-        raise ValueError("malformed credential")
+        raise AuthenticationError("authentication rate limited")
 
 
 async def _downstream(scope: dict[str, Any], receive: Any, send: Any) -> None:
@@ -149,7 +150,7 @@ def test_bearer_token_is_forwarded_to_auth_manager() -> None:
     assert auth.calls == [(None, "token-value")]
 
 
-def test_malformed_bearer_token_fails_closed() -> None:
+def test_authentication_error_fails_closed() -> None:
     app = AuthenticatedMCPApp(_downstream, _RaisingAuth())
     messages = asyncio.run(
         _request(app, headers={"Authorization": "Bearer malformed"})
