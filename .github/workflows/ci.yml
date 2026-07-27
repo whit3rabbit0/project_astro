@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - name: Checkout exact head
+        run: |
+          git init --quiet .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --quiet --depth=1 origin "${GITHUB_SHA}"
+          git checkout --quiet --detach FETCH_HEAD
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet ".[dev,reporting]" build
+
+      - name: Pytest
+        run: pytest -q --tb=short
+
+      - name: Contribution Ruff gate
+        run: >-
+          ruff check
+          src/astro/__main__.py
+          src/astro/server/http_security.py
+          tests/unit/test_http_security.py
+          tests/unit/test_nmap_tool.py
+          tests/unit/test_scope.py
+          tests/unit/test_validators.py
+          --output-format=concise
+
+      - name: Contribution mypy gate
+        run: mypy --follow-imports=skip src/astro/server/http_security.py
+
+      - name: Repository Ruff baseline
+        run: |
+          if ! ruff check src tests --output-format=concise > /tmp/repository-ruff.log; then
+            count=$(wc -l < /tmp/repository-ruff.log)
+            echo "::warning::Repository Ruff baseline has ${count} diagnostics outside this focused contribution."
+          fi
+
+      - name: Repository mypy baseline
+        run: |
+          if ! mypy src > /tmp/repository-mypy.log; then
+            count=$(grep -c ': error:' /tmp/repository-mypy.log || true)
+            echo "::warning::Repository mypy baseline has ${count} errors outside this focused contribution."
+          fi
+
+      - name: Build package
+        run: python -m build
+
+  container:
+    name: Container and Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout exact head
+        run: |
+          git init --quiet .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --quiet --depth=1 origin "${GITHUB_SHA}"
+          git checkout --quiet --detach FETCH_HEAD
+
+      - name: Validate Compose configurations
+        env:
+          API_KEY: ci-placeholder-key
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.lab.yml config --quiet
+
+      - name: Build image
+        run: docker build --quiet --tag project-astro:ci .
+
+      - name: Validate registered runtime binaries
+        run: |
+          docker run --rm --entrypoint sh project-astro:ci -ec '
+            for binary in \
+              nmap gobuster dirb nikto sqlmap msfconsole hydra john wpscan \
+              enum4linux subfinder amass ffuf whatweb dnsrecon theHarvester \
+              searchsploit hashcat responder smbclient evil-winrm bash python3
+            do
+              command -v "$binary" >/dev/null || {
+                echo "missing runtime binary: $binary" >&2
+                exit 1
+              }
+            done
+            command -v crackmapexec >/dev/null || command -v nxc >/dev/null || {
+              echo "missing runtime binary: crackmapexec or nxc" >&2
+              exit 1
+            }
+          '
+
+      - name: Verify authenticated container health
+        run: |
+          docker run --detach --name astro-ci \
+            --publish 127.0.0.1:18080:8080 \
+            --env API_KEY=ci-placeholder-key \
+            project-astro:ci \
+            astro serve --transport streamable-http --port 8080 --host 0.0.0.0
+          trap 'docker logs astro-ci || true; docker rm --force astro-ci >/dev/null 2>&1 || true' EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/health >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "Astro container did not become healthy" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          status=$(curl --silent --output /tmp/unauthorized.json --write-out '%{http_code}' \
+            --request POST \
+            --header 'Accept: application/json, text/event-stream' \
+            --header 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            http://127.0.0.1:18080/mcp)
+          test "$status" = "401"

@@ -34,11 +34,13 @@ def cli() -> None:
 def serve(host: str, port: int, transport: str, scope_config: str | None, debug: bool) -> None:
     """Start the MCP server."""
     import os
+
     os.environ["ASTRO_HOST"] = host
     os.environ["ASTRO_PORT"] = str(port)
 
     from astro.observability.logging import setup_logging
     from astro.server.config import load_config
+    from astro.server.http_security import AuthenticatedMCPApp, validate_http_startup
 
     setup_logging(debug=debug)
 
@@ -50,13 +52,29 @@ def serve(host: str, port: int, transport: str, scope_config: str | None, debug:
         config.scope_config_path = scope_config
     config.debug = debug
 
-    from astro.server.mcp_server import initialize_server, mcp
-    asyncio.run(initialize_server(config))
+    validate_http_startup(config)
+
+    from astro.server import mcp_server
+
+    asyncio.run(mcp_server.initialize_server(config))
 
     if transport == "stdio":
-        mcp.run(transport="stdio")
-    else:
-        mcp.run(transport="streamable-http")
+        mcp_server.mcp.run(transport="stdio")
+        return
+
+    auth = mcp_server._auth
+    if auth is None:
+        raise RuntimeError("Authentication manager was not initialized")
+
+    import uvicorn
+
+    app = AuthenticatedMCPApp(mcp_server.mcp.streamable_http_app(), auth)
+    uvicorn.run(
+        app,
+        host=config.host,
+        port=config.port,
+        log_level="debug" if debug else "info",
+    )
 
 
 @cli.command()
@@ -99,6 +117,7 @@ def tui(target: str, scope_config: str | None, engagement_name: str | None, debu
 
     try:
         from astro.observability.logging import setup_logging
+
         setup_logging(debug=debug)
     except ImportError:
         pass
