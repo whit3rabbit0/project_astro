@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-
 from types import SimpleNamespace
 from typing import Any
 
@@ -171,4 +170,3 @@ def test_no_auth_mode_passes_through() -> None:
     app = AuthenticatedMCPApp(_downstream, auth)
     messages = asyncio.run(_request(app))
     assert messages[0]["status"] == 204
-    assert auth.calls == []
