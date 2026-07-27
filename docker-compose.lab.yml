@@ -37,7 +37,6 @@ services:
     tmpfs:
       - /tmp
       - /var/tmp
-      - /home/astro/.astro
     depends_on:
       - target
     restart: unless-stopped
