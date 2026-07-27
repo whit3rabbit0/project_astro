@@ -207,32 +207,34 @@ async def test_valid_api_key_allows_real_fastmcp_tool_call() -> None:
     called: httpx.Response | None = None
     session_id: str | None = None
 
-    async with server.session_manager.run():
-        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8000") as client:
-            initialized = await client.post("/mcp", json=initialize, headers=base_headers)
-            session_id = initialized.headers.get("mcp-session-id")
-            if initialized.status_code == 200 and session_id:
-                protocol_version = initialized.json()["result"]["protocolVersion"]
-                session_headers = {
-                    **base_headers,
-                    "Mcp-Session-Id": session_id,
-                    "Mcp-Protocol-Version": protocol_version,
-                }
-                notification = await client.post(
-                    "/mcp",
-                    json={"jsonrpc": "2.0", "method": "notifications/initialized"},
-                    headers=session_headers,
-                )
-                called = await client.post(
-                    "/mcp",
-                    json={
-                        "jsonrpc": "2.0",
-                        "id": 2,
-                        "method": "tools/call",
-                        "params": {"name": "ping", "arguments": {}},
-                    },
-                    headers=session_headers,
-                )
+    async with (
+        server.session_manager.run(),
+        httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8000") as client,
+    ):
+        initialized = await client.post("/mcp", json=initialize, headers=base_headers)
+        session_id = initialized.headers.get("mcp-session-id")
+        if initialized.status_code == 200 and session_id:
+            protocol_version = initialized.json()["result"]["protocolVersion"]
+            session_headers = {
+                **base_headers,
+                "Mcp-Session-Id": session_id,
+                "Mcp-Protocol-Version": protocol_version,
+            }
+            notification = await client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+                headers=session_headers,
+            )
+            called = await client.post(
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": "ping", "arguments": {}},
+                },
+                headers=session_headers,
+            )
 
     assert initialized is not None
     assert initialized.status_code == 200, initialized.text
