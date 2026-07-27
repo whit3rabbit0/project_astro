@@ -14,9 +14,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: astro-server
+    command: ["astro", "serve", "--transport", "streamable-http", "--port", "8080", "--host", "0.0.0.0"]
     ports:
-      - "8888:8080"
+      - "127.0.0.1:8888:8080"
     environment:
+      - API_KEY=${API_KEY:?API_KEY_required}
       - ASTRO_HOST=0.0.0.0
       - ASTRO_PORT=8080
       - ASTRO_TRANSPORT=streamable-http
@@ -36,7 +38,6 @@ services:
     tmpfs:
       - /tmp
       - /var/tmp
-      - /home/astro/.astro
     depends_on:
       - target
     restart: unless-stopped
