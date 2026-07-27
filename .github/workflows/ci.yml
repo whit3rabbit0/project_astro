@@ -38,12 +38,8 @@ jobs:
           python -m pip install --quiet --upgrade pip
           python -m pip install --quiet ".[dev,reporting]" build
 
-      - name: Repository Ruff baseline
-        run: |
-          if ! ruff check src tests --output-format=concise > /tmp/repository-ruff.log; then
-            count=$(wc -l < /tmp/repository-ruff.log)
-            echo "::warning::Repository Ruff baseline has ${count} diagnostics outside this focused contribution."
-          fi
+      - name: Pytest
+        run: pytest -q --tb=short
 
       - name: Contribution Ruff gate
         run: >-
@@ -56,15 +52,19 @@ jobs:
       - name: Contribution mypy gate
         run: mypy --follow-imports=skip src/astro/server/http_security.py
 
+      - name: Repository Ruff baseline
+        run: |
+          if ! ruff check src tests --output-format=concise > /tmp/repository-ruff.log; then
+            count=$(wc -l < /tmp/repository-ruff.log)
+            echo "::warning::Repository Ruff baseline has ${count} diagnostics outside this focused contribution."
+          fi
+
       - name: Repository mypy baseline
         run: |
           if ! mypy src > /tmp/repository-mypy.log; then
             count=$(grep -c ': error:' /tmp/repository-mypy.log || true)
             echo "::warning::Repository mypy baseline has ${count} errors outside this focused contribution."
           fi
-
-      - name: Pytest
-        run: pytest -q
 
       - name: Build package
         run: python -m build
