@@ -22,13 +22,15 @@ class AuthResultLike(Protocol):
 
 class AuthManagerLike(Protocol):
     @property
-    def auth_mode(self) -> str: ...
+    def auth_mode(self) -> str:
+        ...
 
     async def authenticate(
         self,
         api_key: str | None = None,
         bearer_token: str | None = None,
-    ) -> AuthResultLike: ...
+    ) -> AuthResultLike:
+        ...
 
 
 def is_loopback_host(host: str) -> bool:
