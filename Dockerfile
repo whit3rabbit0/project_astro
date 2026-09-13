@@ -68,7 +68,9 @@ RUN useradd --create-home --shell /bin/bash astro \
 WORKDIR /app
 COPY --chown=astro:astro . .
 
-ENV ASTRO_HOST=0.0.0.0 \
+# The standalone image is loopback-only by default. Deployments that override
+# ASTRO_HOST to a non-loopback address must also configure API_KEY or OIDC.
+ENV ASTRO_HOST=127.0.0.1 \
     ASTRO_PORT=8080 \
     ASTRO_TRANSPORT=streamable-http \
     ASTRO_DB_PATH=/home/astro/.astro/engagements.db \
@@ -81,4 +83,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 
 USER astro
 
-CMD ["astro", "serve", "--transport", "streamable-http", "--port", "8080", "--host", "0.0.0.0"]
+CMD ["astro", "serve", "--transport", "streamable-http", "--port", "8080", "--host", "127.0.0.1"]

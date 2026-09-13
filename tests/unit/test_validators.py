@@ -84,8 +84,12 @@ class TestValidateAdditionalArgs:
         assert validate_additional_args("-v") == ["-v"]
 
     def test_multiple_safe_tokens(self):
-        result = validate_additional_args("-v --script=http-enum")
-        assert result == ["-v", "--script=http-enum"]
+        result = validate_additional_args("-v --reason")
+        assert result == ["-v", "--reason"]
+
+    def test_rejects_nmap_script_flag(self):
+        with pytest.raises(ValueError, match="Blocked flag"):
+            validate_additional_args("--script=http-enum")
 
     def test_raises_on_semicolon(self):
         with pytest.raises(ValueError, match="Unsafe token"):

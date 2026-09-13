@@ -55,18 +55,20 @@ Flex: `custom_script` (arbitrary bash/python with timeout + sandbox)
 ### Docker (recommended)
 
 ```bash
+export API_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose up --build
 ```
 
-The server starts on `http://localhost:8080` with streamable-HTTP transport. All 38 Kali tools are pre-installed in the image.
+The server starts on `http://localhost:8080` with streamable-HTTP transport. MCP clients must send the configured key in the `X-API-Key` header. All 38 Kali tools are pre-installed in the image.
 
 ### Docker lab (with a target)
 
 ```bash
+export API_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose -f docker-compose.lab.yml up --build
 ```
 
-Starts Astro + a Metasploitable2 target on an isolated `172.28.0.0/24` network with scope pre-configured.
+Starts Astro + a Metasploitable2 target on an isolated `172.28.0.0/24` network with scope pre-configured. The published Astro port remains host-loopback-only.
 
 ### Local install
 
@@ -76,7 +78,9 @@ pip install ".[dev,reporting]"
 astro serve --port 8080
 ```
 
-Requires the underlying Kali tools to be installed on the host.
+The default HTTP bind is loopback-only and may run without network authentication for local development. A non-loopback HTTP bind requires `API_KEY` or OIDC configuration and otherwise refuses to start. Requires the underlying Kali tools to be installed on the host.
+
+See [`docs/HTTP_SECURITY.md`](docs/HTTP_SECURITY.md) for the HTTP startup and request-authentication policy.
 
 ## Usage
 
@@ -84,6 +88,7 @@ Requires the underlying Kali tools to be installed on the host.
 
 ```bash
 astro serve --transport streamable-http --port 8080
+API_KEY="replace-with-a-strong-key" astro serve --transport streamable-http --host 0.0.0.0 --port 8080
 astro serve --transport stdio  # for Claude Desktop / Claude Code
 ```
 

@@ -75,10 +75,10 @@ class TestNmapBuildCommand:
     def test_command_with_additional_args(self, nmap):
         validated = nmap.validate({
             "target": "10.10.10.1",
-            "additional_args": "-v --script=http-enum",
+            "additional_args": "-v --reason",
         })
         cmd = nmap.build_command(validated)
-        assert cmd == ["nmap", "-sV", "-v", "--script=http-enum", "10.10.10.1"]
+        assert cmd == ["nmap", "-sV", "-v", "--reason", "10.10.10.1"]
 
     def test_target_is_last_in_command(self, nmap):
         validated = nmap.validate({

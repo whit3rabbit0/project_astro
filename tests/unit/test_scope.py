@@ -74,12 +74,13 @@ class TestScopeEnforcerPermissive:
         enforcer = ScopeEnforcer(config_path=str(config_file))
         enforcer.validate_target("anything.com")
 
-    def test_empty_allowed_lists_permissive(self, tmp_path):
+    def test_explicit_empty_allowed_lists_deny_everything(self, tmp_path):
         config = {"scope": {"allowed_cidrs": [], "allowed_domains": []}}
         config_file = tmp_path / "empty_lists.yaml"
         config_file.write_text(yaml.dump(config))
         enforcer = ScopeEnforcer(config_path=str(config_file))
-        enforcer.validate_target("anything.com")
+        with pytest.raises(ScopeViolationError, match="not in scope"):
+            enforcer.validate_target("anything.com")
 
 
 class TestToolRestrictions:
